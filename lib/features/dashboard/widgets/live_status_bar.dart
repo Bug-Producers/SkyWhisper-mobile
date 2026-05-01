@@ -1,25 +1,44 @@
 /// Live status indicator bar for the SkyWhisper dashboard.
 ///
-/// Displays a pill-shaped "Live Sensors" badge with a pulsing green
-/// dot on the left, and a "Updated Just Now" timestamp on the right.
-/// This bar communicates that the displayed data is current and
-/// streaming from connected sensors.
+/// Displays a pill-shaped connection badge with a colored dot
+/// indicating the WebSocket connection state, and a timestamp
+/// showing when the last reading was received. Adapts its
+/// appearance based on the [ConnectionStatus] from the
+/// WebSocket service.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
+import '../../../core/data/models/sensor_reading.dart';
+import '../../../core/services/sensor_ws_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_styles.dart';
 
-/// A stateless widget that renders the live-status bar row.
+/// A widget that renders the live-status bar row.
 ///
-/// The green dot uses a small filled [CircleAvatar] and the pill
-/// badge is a [Container] with a rounded border. Both sides of the
-/// row are wrapped in a [Padding] for consistent spacing.
+/// Shows real-time connection state:
+/// - 🟢 **Connected**: "Live Sensors" with green dot.
+/// - 🟡 **Connecting**: "Connecting…" with amber dot.
+/// - 🔴 **Disconnected/Error**: "Offline" with red dot.
+///
+/// The right side shows how recently data was received,
+/// or "No data yet" if no readings have arrived.
 class LiveStatusBar extends StatelessWidget {
-  /// Creates a [LiveStatusBar].
-  const LiveStatusBar({super.key});
+  /// Creates a [LiveStatusBar] with the given connection [status]
+  /// and optional [lastReading] for the timestamp display.
+  const LiveStatusBar({
+    required this.status,
+    this.lastReading,
+    super.key,
+  });
+
+  /// Current WebSocket connection status.
+  final ConnectionStatus status;
+
+  /// The most recently received sensor reading (for timestamp).
+  /// Null if no data has been received yet.
+  final SensorReading? lastReading;
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +47,7 @@ class LiveStatusBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          /// Pill badge: green dot + "Live Sensors" label.
+          /// Pill badge: colored dot + connection label.
           Container(
             padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
             decoration: BoxDecoration(
@@ -39,25 +58,61 @@ class LiveStatusBar extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                /// Animated green circle indicating live status.
+                /// Colored circle indicating connection state.
                 Container(
                   width: 8.w,
                   height: 8.w,
                   decoration: BoxDecoration(
-                    color: AppColors.liveGreen,
+                    color: _dotColor,
                     shape: BoxShape.circle,
                   ),
                 ),
                 SizedBox(width: 8.w),
-                Text('Live Sensors', style: AppStyles.caption),
+                Text(_statusLabel, style: AppStyles.caption),
               ],
             ),
           ),
 
           /// Timestamp indicating data freshness.
-          Text('Updated Just Now', style: AppStyles.caption),
+          Text(_timestampLabel, style: AppStyles.caption),
         ],
       ),
     );
+  }
+
+  // ───────────────────── Derived Display Values ─────────────────────
+
+  /// Returns the dot color based on [status].
+  Color get _dotColor {
+    return switch (status) {
+      ConnectionStatus.connected => AppColors.liveGreen,
+      ConnectionStatus.connecting => const Color(0xFFFBBF24), // Amber.
+      ConnectionStatus.disconnected => const Color(0xFFEF4444), // Red.
+      ConnectionStatus.error => const Color(0xFFEF4444), // Red.
+    };
+  }
+
+  /// Returns the human-readable connection label.
+  String get _statusLabel {
+    return switch (status) {
+      ConnectionStatus.connected => 'Live Sensors',
+      ConnectionStatus.connecting => 'Connecting…',
+      ConnectionStatus.disconnected => 'Offline',
+      ConnectionStatus.error => 'Connection Error',
+    };
+  }
+
+  /// Returns a relative timestamp string based on [lastReading].
+  String get _timestampLabel {
+    if (lastReading == null) return 'No data yet';
+
+    final elapsed = DateTime.now().difference(lastReading!.timestamp);
+
+    if (elapsed.inSeconds < 10) return 'Updated Just Now';
+    if (elapsed.inSeconds < 60) return 'Updated ${elapsed.inSeconds}s ago';
+    if (elapsed.inMinutes < 60) return 'Updated ${elapsed.inMinutes}m ago';
+    if (elapsed.inHours < 24) return 'Updated ${elapsed.inHours}h ago';
+
+    return 'Updated ${elapsed.inDays}d ago';
   }
 }

@@ -1,29 +1,40 @@
 /// Climate overview chart card for SkyWhisper.
 ///
-/// Renders a 30-day climate line chart using [fl_chart] with a
-/// gradient-filled area beneath the curve. Includes a title,
-/// subtitle, and a simple three-dot page indicator at the bottom to
-/// hint at horizontal pagination between chart data sets.
+/// Renders a historical climate line chart using [fl_chart] with a
+/// gradient-filled area beneath the curve. Data is sourced from
+/// the SQLite database via the [dailyAveragesProvider], showing
+/// daily averaged temperature readings from April 1 to May 2.
+///
+/// Includes a title, subtitle, and a three-dot page indicator
+/// for potential future metric switching (temp / humidity / pressure).
 library;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:intl/intl.dart';
 
+import '../../../core/data/models/daily_average.dart';
+import '../../../core/providers/sensor_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_styles.dart';
 
-/// Displays the "Climate – Past 30 days Overview" card.
+/// Displays the "Climate – Daily Averages" chart card.
 ///
-/// The chart data is currently hardcoded to match the design
-/// reference image. In a production build this would be driven by
-/// a view-model or stream of sensor history data.
-class ClimateChartCard extends StatelessWidget {
+/// Uses a [ConsumerWidget] to watch the [dailyAveragesProvider]
+/// and reactively render chart data from the SQLite database.
+/// Shows a loading spinner while data is being fetched, and an
+/// error message if the query fails.
+class ClimateChartCard extends ConsumerWidget {
   /// Creates a [ClimateChartCard].
   const ClimateChartCard({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    /// Watch the daily averages provider for chart data.
+    final averagesAsync = ref.watch(dailyAveragesProvider);
+
     return Container(
       padding: EdgeInsets.all(20.w),
       decoration: AppStyles.cardDecoration,
@@ -33,13 +44,57 @@ class ClimateChartCard extends StatelessWidget {
           /// Card heading.
           Text('Climate', style: AppStyles.sectionTitle),
           SizedBox(height: 4.h),
-          Text('Past 30 days Overview', style: AppStyles.sectionSubtitle),
+          Text('Apr 1 – May 2 Daily Averages', style: AppStyles.sectionSubtitle),
           SizedBox(height: 24.h),
 
-          /// The actual line chart.
+          /// The chart area — handles loading, error, and data states.
           SizedBox(
             height: 180.h,
-            child: LineChart(_buildChartData()),
+            child: averagesAsync.when(
+              /// ── Data loaded: render the line chart ──
+              data: (averages) {
+                if (averages.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'No historical data available',
+                      style: AppStyles.caption,
+                    ),
+                  );
+                }
+                return LineChart(_buildChartData(averages));
+              },
+
+              /// ── Loading: show a subtle spinner ──
+              loading: () => Center(
+                child: SizedBox(
+                  width: 32.w,
+                  height: 32.w,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+
+              /// ── Error: show user-friendly message ──
+              error: (error, _) => Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.cloud_off_rounded,
+                      color: AppColors.textMuted,
+                      size: 32.sp,
+                    ),
+                    SizedBox(height: 8.h),
+                    Text(
+                      'Unable to load chart data',
+                      style: AppStyles.caption,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
           SizedBox(height: 16.h),
 
@@ -64,20 +119,40 @@ class ClimateChartCard extends StatelessWidget {
     );
   }
 
-  /// Builds the [LineChartData] configuration for the climate chart.
+  // ───────────────────── Chart Configuration ─────────────────────
+
+  /// Builds the [LineChartData] from the list of [DailyAverage].
   ///
-  /// Key settings:
-  /// - X-axis represents days 1–30.
-  /// - Y-axis is hidden; grid lines are faint vertical dashes.
-  /// - The area beneath the curve is filled with a vertical blue
-  ///   gradient that fades to transparent.
-  /// - Touch interactions are disabled for a static presentation.
-  LineChartData _buildChartData() {
+  /// Each day is mapped to an X position (0-based day index) and
+  /// the Y value is the daily average temperature. The chart is
+  /// configured with:
+  /// - X-axis: date labels at 7-day intervals.
+  /// - Y-axis: hidden for a clean look.
+  /// - Smooth curved line with gradient area fill.
+  /// - Touch disabled for static presentation.
+  LineChartData _buildChartData(List<DailyAverage> averages) {
+    /// Convert daily averages to chart data points.
+    final spots = averages.asMap().entries.map((entry) {
+      return FlSpot(
+        entry.key.toDouble(),
+        entry.value.avgTemperature,
+      );
+    }).toList();
+
+    /// Calculate Y-axis bounds with padding.
+    final minTemp = averages
+        .map((a) => a.avgTemperature)
+        .reduce((a, b) => a < b ? a : b);
+    final maxTemp = averages
+        .map((a) => a.avgTemperature)
+        .reduce((a, b) => a > b ? a : b);
+    final yPadding = (maxTemp - minTemp) * 0.2;
+
     return LineChartData(
       gridData: FlGridData(
         show: true,
         drawHorizontalLine: false,
-        verticalInterval: 10,
+        verticalInterval: 7,
         getDrawingVerticalLine: (value) => FlLine(
           color: AppColors.border,
           strokeWidth: 1,
@@ -85,22 +160,29 @@ class ClimateChartCard extends StatelessWidget {
         ),
       ),
       titlesData: FlTitlesData(
-        leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        leftTitles:
+            const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        topTitles:
+            const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         rightTitles:
             const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         bottomTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
-            interval: 10,
+            interval: 7,
             getTitlesWidget: (value, meta) {
-              if (value == 0) return const SizedBox.shrink();
+              final index = value.toInt();
+              if (index < 0 || index >= averages.length) {
+                return const SizedBox.shrink();
+              }
+
+              /// Format date as "Apr 8", "Apr 15", etc.
+              final date = averages[index].date;
+              final label = DateFormat('MMM d').format(date);
+
               return Padding(
                 padding: EdgeInsets.only(top: 8.h),
-                child: Text(
-                  value.toInt().toString(),
-                  style: AppStyles.caption,
-                ),
+                child: Text(label, style: AppStyles.caption),
               );
             },
           ),
@@ -108,13 +190,13 @@ class ClimateChartCard extends StatelessWidget {
       ),
       borderData: FlBorderData(show: false),
       minX: 0,
-      maxX: 35,
-      minY: 0,
-      maxY: 100,
+      maxX: (averages.length - 1).toDouble(),
+      minY: minTemp - yPadding,
+      maxY: maxTemp + yPadding,
       lineTouchData: const LineTouchData(enabled: false),
       lineBarsData: [
         LineChartBarData(
-          spots: _sampleSpots,
+          spots: spots,
           isCurved: true,
           curveSmoothness: 0.35,
           color: AppColors.chartLine,
@@ -136,24 +218,4 @@ class ClimateChartCard extends StatelessWidget {
       ],
     );
   }
-
-  /// Hardcoded sample data points that approximate the curve shown
-  /// in the SkyWhisper design reference image.
-  static final List<FlSpot> _sampleSpots = const [
-    FlSpot(1, 20),
-    FlSpot(3, 18),
-    FlSpot(5, 22),
-    FlSpot(8, 30),
-    FlSpot(10, 45),
-    FlSpot(12, 42),
-    FlSpot(15, 48),
-    FlSpot(18, 50),
-    FlSpot(20, 47),
-    FlSpot(22, 52),
-    FlSpot(25, 55),
-    FlSpot(28, 53),
-    FlSpot(30, 60),
-    FlSpot(32, 68),
-    FlSpot(35, 80),
-  ];
 }

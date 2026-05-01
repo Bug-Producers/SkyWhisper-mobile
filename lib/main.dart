@@ -2,21 +2,37 @@
 ///
 /// Initializes [ScreenUtil] with the iPhone-14 design dimensions
 /// (390 × 844) and sets up the [MaterialApp] with the dashboard
-/// screen as the home route. The design-size values ensure that all
-/// `.w`, `.h`, `.sp`, and `.r` extensions produce pixel-perfect
-/// results when previewed on the reference device.
+/// screen as the home route. The app is wrapped in a Riverpod
+/// [ProviderScope] to enable reactive state management across
+/// all widgets.
+///
+/// On first launch, the database is initialized and seeded with
+/// fake historical data (April 1 – May 2, 2026). The WebSocket
+/// connection to the ESP32 station is established automatically
+/// when the dashboard screen mounts.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'features/dashboard/view/dashboard_screen.dart';
 
 /// Application bootstrap — called by the Flutter engine.
+///
+/// Ensures Flutter bindings are initialized before running the
+/// app inside a Riverpod [ProviderScope], which is required for
+/// all `ref.watch` / `ref.read` calls to function.
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const SkyWhisperApp());
+  runApp(
+    /// ProviderScope is the root container for all Riverpod providers.
+    /// It must wrap the entire widget tree.
+    const ProviderScope(
+      child: SkyWhisperApp(),
+    ),
+  );
 }
 
 /// Root widget of the SkyWhisper application.
