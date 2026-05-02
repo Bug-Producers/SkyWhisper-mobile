@@ -15,6 +15,9 @@ import '../../../core/services/sensor_ws_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_styles.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers/sensor_providers.dart';
+
 /// A widget that renders the live-status bar row.
 ///
 /// Shows real-time connection state:
@@ -24,7 +27,7 @@ import '../../../core/theme/app_styles.dart';
 ///
 /// The right side shows how recently data was received,
 /// or "No data yet" if no readings have arrived.
-class LiveStatusBar extends StatelessWidget {
+class LiveStatusBar extends ConsumerWidget {
   /// Creates a [LiveStatusBar] with the given connection [status]
   /// and optional [lastReading] for the timestamp display.
   const LiveStatusBar({
@@ -41,35 +44,49 @@ class LiveStatusBar extends StatelessWidget {
   final SensorReading? lastReading;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final showRetry =
+        status == ConnectionStatus.disconnected || status == ConnectionStatus.error;
+
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20.w),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          /// Pill badge: colored dot + connection label.
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
-            decoration: BoxDecoration(
-              color: AppColors.cardSurface,
-              borderRadius: BorderRadius.circular(24.r),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                /// Colored circle indicating connection state.
-                Container(
-                  width: 8.w,
-                  height: 8.w,
-                  decoration: BoxDecoration(
-                    color: _dotColor,
-                    shape: BoxShape.circle,
-                  ),
+          /// Pill badge: colored dot + connection label + optional retry.
+          GestureDetector(
+            onTap: showRetry
+                ? () => ref.read(wsServiceProvider).connect()
+                : null,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+              decoration: BoxDecoration(
+                color: AppColors.cardSurface,
+                borderRadius: BorderRadius.circular(24.r),
+                border: Border.all(
+                  color: showRetry ? Colors.redAccent.withOpacity(0.3) : AppColors.border,
                 ),
-                SizedBox(width: 8.w),
-                Text(_statusLabel, style: AppStyles.caption),
-              ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  /// Colored circle indicating connection state.
+                  Container(
+                    width: 8.w,
+                    height: 8.w,
+                    decoration: BoxDecoration(
+                      color: _dotColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  Text(_statusLabel, style: AppStyles.caption),
+                  if (showRetry) ...[
+                    SizedBox(width: 8.w),
+                    Icon(Icons.refresh_rounded, size: 14.sp, color: Colors.redAccent),
+                  ],
+                ],
+              ),
             ),
           ),
 

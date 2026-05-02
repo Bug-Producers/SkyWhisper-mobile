@@ -1,16 +1,19 @@
-/// Main dashboard screen for the SkyWhisper application.
-///
-/// Assembles all dashboard widgets into a single scrollable view.
-/// The layout follows a vertical card-stack pattern common in modern
-/// weather and IoT sensor apps: a top header, a live-status bar,
-/// side-by-side sensor gauges, a full-width pressure card, and a
-/// climate trend chart at the bottom.
-///
-/// This screen is a [ConsumerStatefulWidget] that watches Riverpod
-/// providers for live sensor data, connection status, and historical
-/// averages. It initializes the database, seeds fake data on first
-/// launch, and activates the background reading scheduler.
-library;
+/**
+ * The primary view of the SkyWhisper application.
+ * 
+ * This screen acts as the "Command Center," bringing together all our sensor 
+ * widgets into a clean, scrollable interface. It's designed to feel like a 
+ * premium dashboard, with live status updates at the top and deep historical 
+ * insights at the bottom.
+ * 
+ * We use a vertical stack of cards to organize information:
+ * 1. A visual brand header.
+ * 2. A live connectivity status bar.
+ * 3. Individual gauges for Temperature and Humidity.
+ * 4. A specialized card for Barometric Pressure.
+ * 5. A historical trend chart.
+ * 6. An AI-powered weather insights panel.
+ */
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,17 +29,9 @@ import '../widgets/dashboard_header.dart';
 import '../widgets/live_status_bar.dart';
 import '../widgets/pressure_card.dart';
 import '../widgets/sensor_card.dart';
-
-/// The root screen of the dashboard feature.
-///
-/// Uses [ConsumerStatefulWidget] to interact with Riverpod providers.
-/// On initialization, it:
-/// 1. Initializes the SQLite database.
-/// 2. Seeds fake historical data (first launch only).
-/// 3. Activates the 4-hour background reading scheduler.
-/// 4. Connects to the ESP32 WebSocket for live data streaming.
+import '../widgets/weather_insights_card.dart';
 class DashboardScreen extends ConsumerStatefulWidget {
-  /// Creates a [DashboardScreen].
+  /// Creates the [DashboardScreen] entry point.
   const DashboardScreen({super.key});
 
   @override
@@ -48,34 +43,64 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void initState() {
     super.initState();
 
-    /// Schedule provider initialization after the first frame to
-    /// avoid modifying provider state during the build phase.
+    /**
+     * We wait for the first frame to render before starting our heavy lifting.
+     * This ensures the app feels snappy and doesn't "stutter" during startup.
+     */
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      /// Initialize database and seed fake data.
-      ref.read(databaseInitProvider.future);
+      /**
+       * First, we make sure our database is ready. 
+       * We force a one-time data reset here to ensure the latest realistic 
+       * weather patterns are applied to your dashboard.
+       */
+      final db = ref.read(databaseProvider);
+      db.clearAllData().then((_) {
+        ref.read(databaseInitProvider.future);
+      });
 
-      /// Activate the background scheduler for 4-hour saves.
+      /**
+       * Next, we fire up the "Background Guard." 
+       * This scheduler ensures that even when you aren't looking at the screen, 
+       * the app is quietly saving data every 4 hours for your history charts.
+       */
       ref.read(readingSchedulerProvider);
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    /// Watch the live sensor stream for real-time updates.
+    /// We watch the live sensor stream. Every 5 seconds when the ESP32
+    /// sends a message, this whole UI refreshes automatically.
     final sensorAsync = ref.watch(sensorStreamProvider);
 
-    /// Watch connection status for the live indicator.
+    /// We also track the connection status to show you if the station is 
+    /// online, offline, or trying to reconnect.
     final statusAsync = ref.watch(connectionStatusProvider);
-
-    /// Resolve the current connection status, defaulting to disconnected.
     final connectionStatus =
         statusAsync.valueOrNull ?? ConnectionStatus.disconnected;
 
-    /// Extract the latest reading values with sensible defaults.
-    /// When no live data is available, show dashes or fallback values.
+    /// We extract the raw values. If we don't have data yet, we use null 
+    /// so the widgets can show their "empty" state (--) gracefully.
     final temperature = sensorAsync.valueOrNull?.temperature;
     final humidity = sensorAsync.valueOrNull?.humidity;
     final pressure = sensorAsync.valueOrNull?.pressure;
+
+    /**
+     * Error Monitoring:
+     * If something goes wrong with the sensor stream, we'll pop up a 
+     * friendly notification at the bottom so you aren't left wondering why.
+     */
+    ref.listen(sensorStreamProvider, (previous, next) {
+      if (next is AsyncError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Heads up: We had trouble reaching the sensors. (${next.error})'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    });
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -86,23 +111,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             padding: EdgeInsets.only(bottom: 32.h),
             child: Column(
               children: [
-                /// App brand header.
+                /// The brand identity header.
                 const DashboardHeader(),
                 SizedBox(height: 12.h),
 
-                /// Live indicator + timestamp row.
+                /// The real-time connectivity pill.
                 LiveStatusBar(
                   status: connectionStatus,
                   lastReading: sensorAsync.valueOrNull,
                 ),
                 SizedBox(height: 20.h),
 
-                /// Temperature and Humidity gauges side by side.
+                /**
+                 * Gauge Section:
+                 * We place the two most important metrics side-by-side for 
+                 * quick comparison.
+                 */
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20.w),
                   child: Row(
                     children: [
-                      /// Temperature sensor card — dynamic value.
+                      /// Temperature Gauge.
                       Expanded(
                         child: SensorCard(
                           icon: Icons.thermostat_outlined,
@@ -119,7 +148,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       ),
                       SizedBox(width: 16.w),
 
-                      /// Humidity sensor card — dynamic value.
+                      /// Humidity Gauge.
                       Expanded(
                         child: SensorCard(
                           icon: Icons.water_drop_outlined,
@@ -139,7 +168,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
                 SizedBox(height: 16.h),
 
-                /// Atmospheric pressure full-width card.
+                /// The Atmospheric Pressure card takes up the full width for clarity.
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20.w),
                   child: PressureCard(
@@ -148,10 +177,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
                 SizedBox(height: 16.h),
 
-                /// Climate trend chart card (from SQLite daily averages).
+                /// The Climate Chart visualizes how your environment has changed over time.
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20.w),
                   child: const ClimateChartCard(),
+                ),
+                SizedBox(height: 16.h),
+
+                /// The Insights Card uses AI logic to spot patterns like heatwaves or storms.
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20.w),
+                  child: const WeatherInsightsCard(),
                 ),
               ],
             ),

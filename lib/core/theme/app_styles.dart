@@ -94,6 +94,20 @@ abstract final class AppStyles {
         letterSpacing: 1.2,
       );
 
+  /// Card title style — bold, uppercase, 14 sp.
+  static TextStyle get cardTitle => TextStyle(
+        fontSize: 14.sp,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textPrimary,
+      );
+
+  /// Small label style for secondary metadata.
+  static TextStyle get labelSmall => TextStyle(
+        fontSize: 12.sp,
+        fontWeight: FontWeight.w400,
+        color: AppColors.textSecondary,
+      );
+
   // ───────────────────── Decorations ─────────────────────
 
   /// Standard card decoration with rounded corners, a subtle border,

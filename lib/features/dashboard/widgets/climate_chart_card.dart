@@ -19,6 +19,7 @@ import '../../../core/data/models/daily_average.dart';
 import '../../../core/providers/sensor_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_styles.dart';
+import '../../../core/widgets/app_error_widget.dart';
 
 /// Displays the "Climate – Daily Averages" chart card.
 ///
@@ -77,22 +78,9 @@ class ClimateChartCard extends ConsumerWidget {
               ),
 
               /// ── Error: show user-friendly message ──
-              error: (error, _) => Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.cloud_off_rounded,
-                      color: AppColors.textMuted,
-                      size: 32.sp,
-                    ),
-                    SizedBox(height: 8.h),
-                    Text(
-                      'Unable to load chart data',
-                      style: AppStyles.caption,
-                    ),
-                  ],
-                ),
+              error: (error, _) => AppErrorWidget(
+                message: 'Unable to load chart data',
+                onRetry: () => ref.invalidate(dailyAveragesProvider),
               ),
             ),
           ),

@@ -129,24 +129,23 @@ class DatabaseHelper {
     return SensorReading.fromMap(rows.first);
   }
 
-  /// Retrieves all readings for a specific calendar [date].
+  /// Retrieves all raw readings within a specific date and time range.
   ///
-  /// Filters by the date portion of the ISO-8601 timestamp string.
-  /// Results are ordered chronologically (oldest first).
-  Future<List<SensorReading>> getReadingsForDate(DateTime date) async {
+  /// Useful for granular analysis of weather events like rapid
+  /// pressure drops or temperature shifts.
+  Future<List<SensorReading>> getReadingsInRange(DateTime from, DateTime to) async {
     final db = await database;
-    final dateStr =
-        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-
     final rows = await db.query(
       'sensor_readings',
-      where: "date(timestamp) = ?",
-      whereArgs: [dateStr],
+      where: "timestamp >= ? AND timestamp <= ?",
+      whereArgs: [from.toIso8601String(), to.toIso8601String()],
       orderBy: 'timestamp ASC',
     );
 
     return rows.map(SensorReading.fromMap).toList();
   }
+
+  /// Retrieves all readings for a specific calendar [date].
 
   /// Computes daily averages for all readings within a date range.
   ///
@@ -252,6 +251,16 @@ class DatabaseHelper {
       where: "timestamp < ?",
       whereArgs: [cutoff],
     );
+  }
+
+  /// Wipes all data from the database, including readings and metadata.
+  ///
+  /// Used for resetting the application state or clearing fake data
+  /// to trigger a re-seed.
+  Future<void> clearAllData() async {
+    final db = await database;
+    await db.delete('sensor_readings');
+    await db.delete('app_metadata');
   }
 
   /// Returns the total number of sensor readings in the database.
