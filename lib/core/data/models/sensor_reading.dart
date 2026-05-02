@@ -70,9 +70,9 @@ class SensorReading {
   /// ```
   factory SensorReading.fromWsJson(Map<String, dynamic> json) {
     return SensorReading(
-      temperature: (json['t'] as num).toDouble(),
-      humidity: (json['h'] as num).toDouble(),
-      pressure: (json['p'] as num).toDouble(),
+      temperature: ((json['t'] ?? json['temp'] ?? 0) as num).toDouble(),
+      humidity: ((json['h'] ?? json['hum'] ?? json['humidity'] ?? 0) as num).toDouble(),
+      pressure: ((json['p'] ?? json['pres'] ?? json['pressure'] ?? 0) as num).toDouble(),
       timestamp: DateTime.now(),
     );
   }

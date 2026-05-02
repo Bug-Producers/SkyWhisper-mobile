@@ -116,19 +116,20 @@ class SensorWsService {
     try {
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
 
-      /// Wait for the connection to be established.
-      await _channel!.ready;
-
-      _reconnectAttempt = 0;
-      _updateStatus(ConnectionStatus.connected);
-
-      /// Listen to incoming messages.
+      /// Listen to incoming messages IMMEDIATELY. MUST be done before awaiting ready
+      /// to avoid dropping messages or hanging the handshake on mobile platforms.
       _subscription = _channel!.stream.listen(
         _onMessage,
         onError: _onError,
         onDone: _onDone,
         cancelOnError: false,
       );
+
+      /// Wait for the connection to be established.
+      await _channel!.ready;
+
+      _reconnectAttempt = 0;
+      _updateStatus(ConnectionStatus.connected);
     } catch (e) {
       _updateStatus(ConnectionStatus.error);
       _scheduleReconnect();
@@ -172,7 +173,13 @@ class SensorWsService {
   /// discarded with a debug log to avoid crashing the stream.
   void _onMessage(dynamic message) {
     try {
-      final json = jsonDecode(message as String) as Map<String, dynamic>;
+      final String payload;
+      if (message is List<int>) {
+        payload = utf8.decode(message);
+      } else {
+        payload = message.toString();
+      }
+      final json = jsonDecode(payload) as Map<String, dynamic>;
       final reading = SensorReading.fromWsJson(json);
       _readingController.add(reading);
     } catch (e) {

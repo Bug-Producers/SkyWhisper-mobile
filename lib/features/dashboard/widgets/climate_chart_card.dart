@@ -62,7 +62,18 @@ class ClimateChartCard extends ConsumerWidget {
                     ),
                   );
                 }
-                return LineChart(_buildChartData(averages));
+                
+                final chartWidth = averages.length * 40.0.w;
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Container(
+                    width: chartWidth < MediaQuery.of(context).size.width 
+                        ? MediaQuery.of(context).size.width 
+                        : chartWidth,
+                    padding: EdgeInsets.only(right: 20.w, left: 10.w),
+                    child: LineChart(_buildChartData(averages)),
+                  ),
+                );
               },
 
               /// ── Loading: show a subtle spinner ──
@@ -140,7 +151,7 @@ class ClimateChartCard extends ConsumerWidget {
       gridData: FlGridData(
         show: true,
         drawHorizontalLine: false,
-        verticalInterval: 7,
+        verticalInterval: 1,
         getDrawingVerticalLine: (value) => FlLine(
           color: AppColors.border,
           strokeWidth: 1,
@@ -157,7 +168,7 @@ class ClimateChartCard extends ConsumerWidget {
         bottomTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
-            interval: 7,
+            interval: 1,
             getTitlesWidget: (value, meta) {
               final index = value.toInt();
               if (index < 0 || index >= averages.length) {

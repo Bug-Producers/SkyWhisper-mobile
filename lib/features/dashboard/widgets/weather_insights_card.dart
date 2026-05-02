@@ -28,11 +28,7 @@ class WeatherInsightsCard extends ConsumerWidget {
 
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(24.r),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
-      ),
+      decoration: AppStyles.cardDecoration,
       padding: EdgeInsets.all(20.w),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -64,7 +60,7 @@ class WeatherInsightsCard extends ConsumerWidget {
                     child: Text(
                       'Your environment has been stable. No significant events detected lately.',
                       textAlign: TextAlign.center,
-                      style: AppStyles.labelSmall.copyWith(color: Colors.white54),
+                      style: AppStyles.labelSmall,
                     ),
                   ),
                 );
@@ -155,7 +151,7 @@ class _InsightItem extends StatelessWidget {
                     Text(
                       DateFormat('MMM dd').format(event.timestamp),
                       style: TextStyle(
-                        color: Colors.white54,
+                        color: AppColors.textSecondary,
                         fontSize: 10.sp,
                       ),
                     ),
@@ -166,7 +162,7 @@ class _InsightItem extends StatelessWidget {
                 Text(
                   event.description,
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                     fontSize: 13.sp,
                     height: 1.3,
                   ),
@@ -183,13 +179,13 @@ class _InsightItem extends StatelessWidget {
   Color _getSeverityColor(int severity) {
     switch (severity) {
       case 3:
-        return Colors.orangeAccent;
+        return Colors.orange;
       case 2:
-        return Colors.lightBlueAccent;
+        return AppColors.primary;
       case 1:
-        return Colors.tealAccent;
+        return AppColors.teal;
       default:
-        return Colors.white70;
+        return AppColors.textSecondary;
     }
   }
 
